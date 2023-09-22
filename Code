@@ -1,0 +1,152 @@
+
+///////////////
+
+
+Question 1:
+
+1- The time (hour, minute and second) of all the times a parcel has been “READY”:
+
+select parcel_id,convert(time,changed_at) as changed_at_time 
+
+From Data_APP_Q1$ 
+
+Where statut='READY'
+
+2 -  Last time each parcel changed state:
+
+select Max(changed_at) AS max_changed_at, parcel_id
+
+From Data_APP_Q1$
+
+Group by parcel_id
+
+Having Count(Distinct statut) > 1;
+
+3 - Last state of each parcel:
+
+Select distinct parcel_id, statut, changed_at
+
+From Data_APP_Q1$ AS Tab1
+
+Where changed_at = (
+
+
+    Select Max(changed_at) 
+
+    From Data_APP_Q1$ AS Tab2 
+
+    Where Tab2.parcel_id = Tab1.parcel_id)
+
+
+**************
+Question 2:
+
+1-Which courier did the 1st attempt of each day?
+
+Select courier_id, update_time
+
+From Data_APP_Q2..courier_deliveries$
+
+Where id IN (
+
+    Select delivery_id
+
+    From Freelance_projects..courier_delivery_pack$
+
+    Where update_time = (Select Min(update_time) As min_update_time
+
+    From Data_APP_Q2_delivery_pack$)
+
+    Group by delivery_id, cast(update_time as date)
+)
+
+
+2-What’s the main reason why parcels are not delivered? What % does it represent of the
+total unsuccessful attempts?:
+
+Select main_reason, (count (case when undelivered_reason=main_reason  then 1 end)*100.000/ count(*)) as pourcentage_of_main_reason
+
+From Data_APP_Q2..courier_delivery_pack$ , (
+
+Select TOP 1 undelivered_reason as main_reason from Data_APP_Q2..courier_delivery_pack$ most_common_reason
+
+where undelivered_reason is not null
+
+group by undelivered_reason ) as most_commun_reason
+
+group by main_reason
+
+
+3- Is there a time of day you’d recommend to stop delivering? Why? (SQL query answer)
+
+Select 
+
+    TOP 1
+
+    DATEPART(Hour, update_time) As hour_of_day,
+
+    Count(*) As failed_delivery_count
+
+from 
+
+    Data_APP_Q2..courier_delivery_pack$
+
+where 
+
+    status = 'RETURNED'
+
+group by
+
+    DATEPART(Hour, update_time)
+
+order by 
+
+    failed_delivery_count Desc
+
+
+
+***********
+Question 3:
+
+Assuming that activation_time_local is when the customer completed the signup process.
+
+Assuming that registration_date is when the app recorded the date of the first order.
+
+Assuming that first_order in the "orders" table represents the ID of the first order, which matches the first_order_id in the "users" table. 
+
+Here is a preview of an SQL time-based cohort analysis.
+
+------
+
+Select
+
+    DATEPART(week, activation_time_local) As cohort_week,
+
+    Count(Distinct customer_id) As cohort_size,
+
+    Count(Distinct  Case when Datediff(week, activation_time_local, registration_date) <=  0 Then customer_id end) As week_order_0,
+
+    Count(Distinct  Case when Datediff(week, activation_time_local, registration_date) >= 1 Then customer_id end) As week_order_1,
+
+    Count(Distinct  Case when Datediff(week, activation_time_local, registration_date) >= 2 Then customer_id end) As week_order_2,
+
+    Count(Distinct  Case when Datediff(week, activation_time_local, registration_date) >= 3 Then customer_id end) As week_order_3
+
+From
+
+    Data_APP_Q3$..users$
+
+Inner join
+
+    Data_APP_Q3$..orders$
+ON
+    first_order_id = first_order
+
+Group by
+
+    DATEPART(week, activation_time_local)
+
+
+
+
+----------------------
